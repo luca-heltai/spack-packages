@@ -501,6 +501,8 @@ class Vtk(CMakePackage):
 
         compile_flags = []
 
+        cmake_args.extend(["VTK_MODULE_ENABLE_VTK_RenderingGL2PSOpenGL2:BOOL=OFF"])
+
         if spec.satisfies("@:6.1.0"):
             compile_flags.append("-DGLX_GLXEXT_LEGACY")
 

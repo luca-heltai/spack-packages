@@ -174,8 +174,18 @@ class Opencascade(CMakePackage):
             args.append(build_module(module))
 
         # Specify which 3rd party features to build
-        args += use_3rdparty("tcl")
+        # args += use_3rdparty("tcl")
         args += use_3rdparty("tk")
+         # Tcl/Tk need exact paths to the library + include on macOS
+        # (OCCT honors these variables across platforms, so it's safe elsewhere too.)
+        tcl_libs = spec["tcl"].libs
+        tcl_hdrs = spec["tcl"].headers
+        args += [
+            self.define('USE_TCL', True),
+            self.define('3RDPARTY_TCL_LIBRARY', tcl_libs[0]),
+            self.define('3RDPARTY_TCL_LIBRARY_DIR', tcl_libs.directories[0]),
+            self.define('3RDPARTY_TCL_INCLUDE_DIR', tcl_hdrs.directories[0]),
+        ]
         args += use_3rdparty("ffmpeg")
         args += use_3rdparty("freeimage")
         args += use_3rdparty("freetype")

@@ -70,18 +70,11 @@ class Dealii(CMakePackage, CudaPackage):
     )
     variant(
         "cxxstd",
-        default="default",
-        multi=False,
-        description="Compile using the specified C++ standard",
-        values=("default", "11", "14", "17"),
-    )
-    variant(
-        "cxxstd",
         default="17",
         when="@9.4:",
         multi=False,
         description="Compile using the specified C++ standard",
-        values=("default", "11", "14", "17"),
+        values=("default", "11", "14", "17", "20"),
     )
     variant("doc", default=False, description="Compile with documentation")
     variant("examples", default=True, description="Install source files of tutorial programs")
@@ -111,10 +104,11 @@ class Dealii(CMakePackage, CudaPackage):
     variant("gsl", default=True, description="Compile with GSL")
     variant("hdf5", default=True, description="Compile with HDF5 (only with MPI)")
     variant("kokkos", default=True, when="@9.5:", description="Compile with Kokkos")
+    variant("magic-enum", default=True, when="@9.7:", description="Compile with Magic Enum")
     variant("metis", default=True, description="Compile with Metis")
     variant("muparser", default=True, description="Compile with muParser")
     variant("nanoflann", default=False, description="Compile with Nanoflann")
-    variant("netcdf", default=False, description="Compile with Netcdf (only with MPI)")
+    variant("netcdf", when="@:9.6", default=False, description="Compile with Netcdf (only with MPI)")
     variant("opencascade", default=True, description="Compile with OPENCASCADE")
     variant("p4est", default=True, description="Compile with P4est (only with MPI)")
     variant("petsc", default=True, description="Compile with Petsc (only with MPI)")
@@ -218,6 +212,7 @@ class Dealii(CMakePackage, CudaPackage):
     depends_on(
         "kokkos@3.7:+cuda+cuda_lambda+cuda_constexpr+wrapper", when="@9.6:+kokkos~trilinos+cuda"
     )
+    depends_on("magic-enum", when="@9.7:+magic-enum")
     # TODO: concretizer bug. The two lines mimic what comes from PETSc
     # but we should not need it
     depends_on("metis@5:+int64", when="+metis+int64")
@@ -499,7 +494,7 @@ class Dealii(CMakePackage, CudaPackage):
         # Enforce the specified C++ standard
         if spec.variants["cxxstd"].value != "default":
             cxxstd = spec.variants["cxxstd"].value
-            cxx_flags.extend(["-std=c++{0}".format(cxxstd)])
+            options.append(self.define("CMAKE_CXX_STANDARD", "{0}".format(cxxstd)))
 
         # Performance
         # Set recommended flags for maximum (matrix-free) performance, see
@@ -626,6 +621,11 @@ class Dealii(CMakePackage, CudaPackage):
                     self.define("DEAL_II_ARPACK_WITH_PARPACK", True),
                 ]
             )
+
+        # magic-enum
+        options.append(self.define_from_variant("DEAL_II_WITH_MAGIC_ENUM", "magic-enum"))
+        if spec.satisfies("+magic-enum"):
+            options.append(self.define("MAGIC_ENUM_DIR", spec["magic-enum"].prefix))
 
         # NetCDF
         # since Netcdf is spread among two, need to do it by hand:
