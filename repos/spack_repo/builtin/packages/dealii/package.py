@@ -7,6 +7,7 @@ import os
 from spack_repo.builtin.build_systems.cmake import CMakePackage, generator
 from spack_repo.builtin.build_systems.cuda import CudaPackage
 from spack_repo.builtin.packages.boost.package import Boost
+from spack.mixins import filter_compiler_wrappers
 
 from spack.package import *
 
@@ -81,7 +82,7 @@ class Dealii(CMakePackage, CudaPackage):
         when="@9.4:",
         multi=False,
         description="Compile using the specified C++ standard",
-        values=("default", "11", "14", "17"),
+        values=("default", "11", "14", "17", "20"),
     )
     variant("doc", default=False, description="Compile with documentation")
     variant("examples", default=True, description="Install source files of tutorial programs")
@@ -111,13 +112,16 @@ class Dealii(CMakePackage, CudaPackage):
     variant("gsl", default=True, description="Compile with GSL")
     variant("hdf5", default=True, description="Compile with HDF5 (only with MPI)")
     variant("kokkos", default=True, when="@9.5:", description="Compile with Kokkos")
+    variant("magic-enum", when="@9.7:", default=True, description="Compile with magic-enum")
     variant("metis", default=True, description="Compile with Metis")
+    variant("mumps", when="@9.7:", default=True, description="Compile with MUMPS")
     variant("muparser", default=True, description="Compile with muParser")
     variant("nanoflann", default=False, description="Compile with Nanoflann")
     variant("netcdf", default=False, description="Compile with Netcdf (only with MPI)")
     variant("opencascade", default=True, description="Compile with OPENCASCADE")
     variant("p4est", default=True, description="Compile with P4est (only with MPI)")
     variant("petsc", default=True, description="Compile with Petsc (only with MPI)")
+    variant("psblas", default=True, when="@9.7:", description="Compile with PSBLAS (only with MPI)")
     variant("scalapack", default=True, description="Compile with ScaLAPACK (only with MPI)")
     variant("sundials", default=True, description="Compile with Sundials", when="@9.3:")
     variant("slepc", default=True, description="Compile with Slepc (only with Petsc and MPI)")
@@ -218,10 +222,13 @@ class Dealii(CMakePackage, CudaPackage):
     depends_on(
         "kokkos@3.7:+cuda+cuda_lambda+cuda_constexpr+wrapper", when="@9.6:+kokkos~trilinos+cuda"
     )
+    depends_on("magic-enum", when="+magic-enum")
     # TODO: concretizer bug. The two lines mimic what comes from PETSc
     # but we should not need it
     depends_on("metis@5:+int64", when="+metis+int64")
     depends_on("metis@5:~int64", when="+metis~int64")
+    depends_on("mumps+mpi", when="+mumps+mpi")
+    depends_on("mumps~mpi", when="+mumps~mpi")
     depends_on("muparser", when="+muparser")
     # Nanoflann support has been removed after 9.2.0
     depends_on("nanoflann", when="@9.0:9.2+nanoflann")
@@ -231,13 +238,17 @@ class Dealii(CMakePackage, CudaPackage):
     depends_on("p4est", when="+p4est+mpi")
     depends_on("petsc+mpi~int64", when="+petsc+mpi~int64")
     depends_on("petsc+mpi+int64", when="+petsc+mpi+int64")
+    depends_on("psblas@develop LPK=8", when="+psblas+int64")
+    depends_on("psblas@develop LPK=4", when="+psblas~int64")
+    depends_on("amg4psblas@develop", when="+psblas+mpi")
     depends_on("scalapack", when="@9.0:+scalapack")
     depends_on("slepc", when="+slepc+petsc+mpi")
     depends_on("slepc~arpack", when="+slepc+petsc+mpi+int64")
     depends_on("sundials@5:5.8", when="@9.3:9.3.3+sundials")
     depends_on("sundials@5:6.7", when="@9.3.4:+sundials")
-    depends_on("taskflow@3.4:", when="@9.6:+taskflow")
-    depends_on("taskflow@3.10:", when="@9.7:+taskflow")
+    depends_on("taskflow@3.4:3", when="@9.6:+taskflow")
+    depends_on("taskflow@3.10:3", when="@9.7:+taskflow cxxstd=17")
+    depends_on("taskflow@3.10", when="@9.7:+taskflow cxxstd=20")
     depends_on("trilinos gotype=int", when="+trilinos@12.18.1:")
     depends_on("trilinos+cuda+cuda_constexpr", when="@9.6:+trilinos+cuda")
     # TODO: next line fixes concretization with trilinos and adol-c
@@ -442,6 +453,12 @@ class Dealii(CMakePackage, CudaPackage):
         "+slepc", when="~petsc", msg="It is not possible to enable slepc interfaces without petsc."
     )
 
+    # Make sure we filter the compiler wrappers
+    filter_compiler_wrappers(
+        "deal.IIConfig.cmake",
+        relative_root="lib/cmake/deal.II",
+    )
+
     def cmake_args(self):
         spec = self.spec
         options = []
@@ -592,10 +609,12 @@ class Dealii(CMakePackage, CudaPackage):
             "gsl",
             "hdf5",
             "metis",
+            "mumps",
             "muparser",
             "nanoflann",
             "p4est",
             "petsc",
+            "psblas",
             "slepc",
             "sundials",
             "symengine",
@@ -616,6 +635,8 @@ class Dealii(CMakePackage, CudaPackage):
         options.append(self.define_from_variant("DEAL_II_WITH_ADOLC", "adol-c"))
         if spec.satisfies("+adol-c"):
             options.append(self.define("ADOLC_DIR", spec["adol-c"].prefix))
+
+        options.append(self.define_from_variant("DEAL_II_WITH_MAGIC_ENUM", "magic-enum"))
 
         # ARPACK
         options.append(self.define_from_variant("DEAL_II_WITH_ARPACK", "arpack"))
