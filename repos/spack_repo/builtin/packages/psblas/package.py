@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
+import os
+
 from spack_repo.builtin.build_systems.autotools import AutotoolsPackage
 
 from spack.package import *
@@ -35,9 +37,9 @@ class Psblas(AutotoolsPackage):
     version("3.8.1", sha256="02e1f00e644426eb15eb08c735cf9c8ae692392f35c2cfe4f7474e1ab91575dc")
     version("3.8.0-2", sha256="86a76bb0987edddd4c10c810d7f18e13742aadc66ac14ad3679669809c1184fa")
 
-    # Explicit phases: autoreconf, configure, build, install, and post_install
-    # which compiles the examples in the prefix/samples folder
-    phases = ["configure", "build", "install", "samples"]
+    # Explicit phases: configure, build, install.
+    # Skip optional sample compilation, which can fail on some toolchains.
+    phases = ["configure", "build", "install"]
 
     # Variants:
     # LPK/IPK: Integer precision variants
@@ -156,7 +158,23 @@ class Psblas(AutotoolsPackage):
         configure = Executable("./configure")
         configure(*self.configure_args())
 
+    def setup_build_environment(self, env):
+        if self.spec.satisfies("platform=darwin"):
+            env.set("AR", "/usr/bin/ar")
+            env.set("ARFLAGS", "-rcs")
+
     def build(self, spec, prefix):
+        if self.spec.satisfies("platform=darwin"):
+            for rel in ("Make.inc", "include/Make.inc.psblas"):
+                p = os.path.join(self.stage.source_path, rel)
+                if not os.path.exists(p):
+                    continue
+                with open(p, "r", encoding="utf-8") as f:
+                    txt = f.read()
+                txt2 = txt.replace("AR=ar -cDr", "AR=ar -rcs").replace("-cDr", "-rcs")
+                if txt2 != txt:
+                    with open(p, "w", encoding="utf-8") as f:
+                        f.write(txt2)
         make()
 
     def install(self, spec, prefix):
