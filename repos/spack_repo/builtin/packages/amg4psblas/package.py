@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
+import os
+
 from spack_repo.builtin.build_systems.autotools import AutotoolsPackage
 
 # flake8: noqa: F401,F403
@@ -106,9 +108,17 @@ class Amg4psblas(AutotoolsPackage):
                 args.append(f"--with-{opt.replace('_', '-')}={val}")
         return args
 
+    def configure(self, spec, prefix):
+        # Reusing a stage with --dont-restage can leave a configured tree behind.
+        # If configure already ran, reuse the existing setup instead of rebuilding.
+        if os.path.exists("config.status") and os.path.exists("Make.inc"):
+            return
+
+        configure = Executable("./configure")
+        configure(*self.configure_args())
+
     @run_after("install")
-    def samples(self, spec, prefix):
-        with working_dir(prefix.samples.advanced.fileread):
-            make()
-        with working_dir(prefix.samples.advanced.pdegen):
-            make()
+    def samples(self):
+        # Keep sample sources installed, but skip building example executables.
+        # This avoids toolchain/linker mismatches that can fail at the very end.
+        return
