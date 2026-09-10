@@ -33,6 +33,7 @@ class Dealii(CMakePackage, CudaPackage):
     generator("make")
 
     version("master", branch="master")
+    version("9.8.0", sha256="d8d66aac57baad145a752d3f11cf72cfa9457e3f99ae09e5c8d5c9259a83aee1")
     version("9.7.1", sha256="0f2096ef83db54fdcebe9f3d148fa713f63f1c3f567941b53bcb4a1a8ea7de43")
     version("9.7.0", sha256="398ffbb5de1ea52b88a47aaa54a253ad58ee4e810a8c5aa0a0f549ecb1bc4c6c")
     version("9.6.2", sha256="1051e332de3822488e91c2b0460681052a3c4c5ac261cdd7a6af784869a25523")
@@ -227,8 +228,10 @@ class Dealii(CMakePackage, CudaPackage):
     # but we should not need it
     depends_on("metis@5:+int64", when="+metis+int64")
     depends_on("metis@5:~int64", when="+metis~int64")
-    depends_on("mumps+mpi", when="+mumps+mpi")
-    depends_on("mumps~mpi", when="+mumps~mpi")
+    depends_on("mumps+mpi+int64", when="+mumps+mpi+int64")
+    depends_on("mumps+mpi~int64", when="+mumps+mpi~int64")
+    depends_on("mumps~mpi+int64", when="+mumps~mpi+int64")
+    depends_on("mumps~mpi~int64", when="+mumps~mpi~int64")
     depends_on("muparser", when="+muparser")
     # Nanoflann support has been removed after 9.2.0
     depends_on("nanoflann", when="@9.0:9.2+nanoflann")
@@ -279,6 +282,10 @@ class Dealii(CMakePackage, CudaPackage):
         trilinos_spec = f"trilinos +wrapper {arch_str}"
         depends_on(trilinos_spec, when=f"@9.5:+trilinos {arch_str}")
     depends_on("vtk@9:", when="@9.6:+vtk")
+
+    # MUMPS +int64 changes ICNTL's element type to MUMPS_INT.  The 9.8.0
+    # interface declaration still returns int*, which fails with MUMPS integer*8.
+    patch("mumps-int64-get-icntl.patch", when="@9.8.0")
 
     # Explicitly provide a destructor in BlockVector,
     # otherwise deal.II may fail to build with Intel compilers.
@@ -462,6 +469,12 @@ class Dealii(CMakePackage, CudaPackage):
     def cmake_args(self):
         spec = self.spec
         options = []
+
+        # Kokkos' global launch compiler adds CUDA-only options to deal.II's
+        # host compiler sanity checks. deal.II explicitly uses nvcc_wrapper
+        # below, so disable the additional global launcher redirection.
+        if spec.satisfies("+trilinos+kokkos"):
+            options.append(self.define("Kokkos_LAUNCH_COMPILER", False))
         # Release flags
         cxx_flags_release = []
         # Debug and release flags
@@ -574,7 +587,9 @@ class Dealii(CMakePackage, CudaPackage):
                         self.define("CUDA_HOST_COMPILER", spec["mpi"].mpicxx),
                     ]
                 )
-            # Make sure we use the same compiler that Trilinos uses
+            # Kokkos CUDA requires its backend compiler wrapper globally.
+            # This is also required when deal.II itself is ~cuda but Trilinos
+            # supplies the external CUDA-enabled Kokkos backend.
             if spec.satisfies("+trilinos"):
                 options.extend([self.define("CMAKE_CXX_COMPILER", self["trilinos"].kokkos_cxx)])
 
