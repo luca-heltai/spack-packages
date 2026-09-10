@@ -7,8 +7,8 @@ import os
 from spack_repo.builtin.build_systems.cmake import CMakePackage, generator
 from spack_repo.builtin.build_systems.cuda import CudaPackage
 from spack_repo.builtin.packages.boost.package import Boost
-from spack.mixins import filter_compiler_wrappers
 
+from spack.mixins import filter_compiler_wrappers
 from spack.package import *
 
 
@@ -122,7 +122,9 @@ class Dealii(CMakePackage, CudaPackage):
     variant("opencascade", default=True, description="Compile with OPENCASCADE")
     variant("p4est", default=True, description="Compile with P4est (only with MPI)")
     variant("petsc", default=True, description="Compile with Petsc (only with MPI)")
-    variant("psblas", default=True, when="@9.7:", description="Compile with PSBLAS (only with MPI)")
+    variant(
+        "psblas", default=True, when="@9.7:", description="Compile with PSBLAS (only with MPI)"
+    )
     variant("scalapack", default=True, description="Compile with ScaLAPACK (only with MPI)")
     variant("sundials", default=True, description="Compile with Sundials", when="@9.3:")
     variant("slepc", default=True, description="Compile with Slepc (only with Petsc and MPI)")
