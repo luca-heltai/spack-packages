@@ -41,6 +41,10 @@ class Psblas(AutotoolsPackage):
     # Skip optional sample compilation, which can fail on some toolchains.
     phases = ["configure", "build", "install"]
 
+    # PSBLAS's legacy Fortran Makefiles race when compiling in parallel:
+    # multiple targets write the same .mod/.smod files.
+    parallel = False
+
     # Variants:
     # LPK/IPK: Integer precision variants
     variant(
