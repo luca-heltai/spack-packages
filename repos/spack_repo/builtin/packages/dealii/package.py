@@ -230,10 +230,10 @@ class Dealii(CMakePackage, CudaPackage):
     # but we should not need it
     depends_on("metis@5:+int64", when="+metis+int64")
     depends_on("metis@5:~int64", when="+metis~int64")
-    depends_on("mumps+mpi+int64", when="+mumps+mpi+int64")
-    depends_on("mumps+mpi~int64", when="+mumps+mpi~int64")
-    depends_on("mumps~mpi+int64", when="+mumps~mpi+int64")
-    depends_on("mumps~mpi~int64", when="+mumps~mpi~int64")
+    # MUMPS integer width is independent of deal.II's global index width.
+    # In particular, LP64 BLAS/ScaLAPACK require MUMPS with 32-bit integers.
+    depends_on("mumps+mpi", when="+mumps+mpi")
+    depends_on("mumps~mpi", when="+mumps~mpi")
     depends_on("muparser", when="+muparser")
     # Nanoflann support has been removed after 9.2.0
     depends_on("nanoflann", when="@9.0:9.2+nanoflann")
@@ -241,10 +241,12 @@ class Dealii(CMakePackage, CudaPackage):
     depends_on("netcdf-cxx", when="+netcdf+mpi")
     depends_on("opencascade", when="+opencascade")
     depends_on("p4est", when="+p4est+mpi")
-    depends_on("petsc@:3.24+mpi~int64", when="+petsc+mpi~int64")
-    depends_on("petsc@:3.24+mpi+int64", when="+petsc+mpi+int64")
-    depends_on("psblas@develop LPK=8", when="+psblas+int64")
-    depends_on("psblas@develop LPK=4", when="+psblas~int64")
+    depends_on("petsc+mpi~int64", when="+petsc+mpi~int64")
+    depends_on("petsc+mpi+int64", when="+petsc+mpi+int64")
+    depends_on("petsc@:3.24", when="@:9.7 +petsc")
+    depends_on("petsc@:3.25", when="@9.8: +petsc")
+    depends_on("psblas@develop+mpi LPK=8 extra_opt=-fPIC", when="+psblas+int64")
+    depends_on("psblas@develop+mpi LPK=4 extra_opt=-fPIC", when="+psblas~int64")
     depends_on("amg4psblas@develop", when="+psblas+mpi")
     depends_on("scalapack", when="@9.0:+scalapack")
     depends_on("slepc", when="+slepc+petsc+mpi")
@@ -254,7 +256,8 @@ class Dealii(CMakePackage, CudaPackage):
     depends_on("taskflow@3.4:3", when="@9.6:+taskflow")
     depends_on("taskflow@3.10:3", when="@9.7:+taskflow cxxstd=17")
     depends_on("taskflow@3.10:", when="@9.7:+taskflow cxxstd=20")
-    depends_on("trilinos gotype=int", when="+trilinos@12.18.1:")
+    depends_on("trilinos gotype=int", when="@9.0: +trilinos ~int64")
+    depends_on("trilinos gotype=long_long", when="@9.0: +trilinos +int64")
     depends_on("trilinos+cuda+cuda_constexpr", when="@9.6:+trilinos+cuda")
     # TODO: next line fixes concretization with trilinos and adol-c
     depends_on("trilinos~exodus", when="@9.0:+adol-c+trilinos")
@@ -433,6 +436,7 @@ class Dealii(CMakePackage, CudaPackage):
         "netcdf",
         "p4est",
         "petsc",
+        "psblas",
         "scalapack",
         "slepc",
         "trilinos",
@@ -651,7 +655,8 @@ class Dealii(CMakePackage, CudaPackage):
         if spec.satisfies("+adol-c"):
             options.append(self.define("ADOLC_DIR", spec["adol-c"].prefix))
 
-        options.append(self.define_from_variant("DEAL_II_WITH_MAGIC_ENUM", "magic-enum"))
+        if "magic-enum" in spec.variants:
+            options.append(self.define_from_variant("DEAL_II_WITH_MAGIC_ENUM", "magic-enum"))
 
         # ARPACK
         options.append(self.define_from_variant("DEAL_II_WITH_ARPACK", "arpack"))
